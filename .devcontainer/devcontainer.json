@@ -1,6 +1,19 @@
 {
-  "image": "mcr.microsoft.com/devcontainers/universal:2",
+  "build": {
+    "dockerfile": "./Dockerfile",
+    "context": "."
+  },
   "features": {
-    "ghcr.io/devcontainers-community/features/llvm:3": {}
-  }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+		"ms-azuretools.vscode-docker"
+	]
+    }
+  },
+  "containerEnv": {
+    "LLVM": "1"
+  },
+  "remoteUser": "root"
 }

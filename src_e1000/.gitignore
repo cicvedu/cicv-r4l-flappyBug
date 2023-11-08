@@ -8,3 +8,4 @@ r4l_e1000_demo.mod.o
 r4l_e1000_demo.o
 rootfs_img
 /rootfs/
+dump.dat
