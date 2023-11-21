@@ -12,19 +12,17 @@ const GLOBALMEM_SIZE: usize = 0x1000;
 
 module! {
     type: RustChrdev,
-    name: "rust_chrdev",
+    name: "cicv",
     author: "Rust for Linux Contributors",
     description: "Rust character device sample",
     license: "GPL",
 }
 
-static GLOBALMEM_BUF: Mutex<[u8;GLOBALMEM_SIZE]> = unsafe {
-    Mutex::new([0u8;GLOBALMEM_SIZE])
-};
+static GLOBALMEM_BUF: Mutex<[u8; GLOBALMEM_SIZE]> = unsafe { Mutex::new([0u8; GLOBALMEM_SIZE]) };
 
 struct RustFile {
     #[allow(dead_code)]
-    inner: &'static Mutex<[u8;GLOBALMEM_SIZE]>,
+    inner: &'static Mutex<[u8; GLOBALMEM_SIZE]>,
 }
 
 #[vtable]
@@ -32,19 +30,35 @@ impl file::Operations for RustFile {
     type Data = Box<Self>;
 
     fn open(_shared: &(), _file: &file::File) -> Result<Box<Self>> {
-        Ok(
-            Box::try_new(RustFile {
-                inner: &GLOBALMEM_BUF
-            })?
-        )
+        Ok(Box::try_new(RustFile {
+            inner: &GLOBALMEM_BUF,
+        })?)
     }
 
-    fn write(_this: &Self,_file: &file::File,_reader: &mut impl kernel::io_buffer::IoBufferReader,_offset:u64,) -> Result<usize> {
-        Err(EPERM)
+    fn write(
+        this: &Self,
+        _file: &file::File,
+        reader: &mut impl kernel::io_buffer::IoBufferReader,
+        offset: u64,
+    ) -> Result<usize> {
+        let copy = reader.read_all()?;
+        let offset: usize = offset.try_into()?;
+        let len = copy.len();
+        this.inner.lock()[offset..offset + len].copy_from_slice(&copy);
+        Ok(len)
     }
 
-    fn read(_this: &Self,_file: &file::File,_writer: &mut impl kernel::io_buffer::IoBufferWriter,_offset:u64,) -> Result<usize> {
-        Err(EPERM)
+    fn read(
+        this: &Self,
+        _file: &file::File,
+        writer: &mut impl kernel::io_buffer::IoBufferWriter,
+        offset: u64,
+    ) -> Result<usize> {
+        let offset: usize = offset.try_into()?;
+        let data = this.inner.lock();
+        let len = core::cmp::min(writer.len(), data.len().saturating_sub(offset));
+        writer.write_slice(&data[offset..offset + len])?;
+        Ok(len)
     }
 }
 
@@ -61,7 +75,6 @@ impl kernel::Module for RustChrdev {
         // Register the same kind of device twice, we're just demonstrating
         // that you can use multiple minors. There are two minors in this case
         // because its type is `chrdev::Registration<2>`
-        chrdev_reg.as_mut().register::<RustFile>()?;
         chrdev_reg.as_mut().register::<RustFile>()?;
 
         Ok(RustChrdev { _dev: chrdev_reg })
