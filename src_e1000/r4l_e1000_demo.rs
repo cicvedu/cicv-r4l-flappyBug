@@ -5,6 +5,7 @@
 #![allow(unused)]
 
 use core::iter::Iterator;
+use core::ops::Deref;
 use core::sync::atomic::AtomicPtr;
 
 use kernel::device::RawDevice;
@@ -311,6 +312,7 @@ impl kernel::irq::Handler for E1000InterruptHandler {
 /// the private data for the adapter
 struct E1000DrvPrvData {
     _netdev_reg: net::Registration<NetDevice>,
+    _bars: i32,
 }
 
 impl driver::DeviceRemoval for E1000DrvPrvData {
@@ -469,11 +471,14 @@ impl pci::Driver for E1000Drv {
         Ok(Box::try_new(E1000DrvPrvData {
             // Must hold this registration, or the device will be removed.
             _netdev_reg: netdev_reg,
+            _bars: bars,
         })?)
     }
 
-    fn remove(data: &Self::Data) {
+    fn remove(dev: &mut pci::Device, data: &Self::Data) {
         pr_info!("Rust for linux e1000 driver demo (remove)\n");
+        let netdev = data._netdev_reg.dev_get().deref();
+        dev.release_selected_regions(data._bars);
     }
 }
 struct E1000KernelMod {

@@ -65,3 +65,29 @@ obj-$(CONFIG_SAMPLE_RUST_HELLOWORLD)	+= rust_helloworld.o
 7. 进入到src_e1000, `./build_image.sh`
 
 ![](./hello-world.png)
+
+## 作业4：为e1000网卡驱动添加remove代码
+
+### 步骤
+1. 在不做任何修改的情况下测试rmmod 后insmod，发现报错，提示reserve memory失败。
+2. 查看probe的代码，怀疑是`dev.request_selected_regions(bars, c_str!("e1000 reserved memory"))?;`报错。查看`e1000_main.c:e1000_probe`和`e1000_main.c:e1000_remove`的代码，从命名上感觉`pci_release_selected_regions`应该是和`request_selected_regions`互逆的操作。
+3. `pci_release_selected_regions`需要pdev。靠现有的函数签名貌似无法拿到pdev。修改`pci::Driver` trait和`remove_callback`，使之调用的时候传入pdev。
+4. 重新编译内核，然后./build_image.sh。测试后发现可正常运行。
+5. 当然相对于C的版本还有一大堆善后工作没做，不过能跑了，就这样吧:)
+
+![](./rmmod.png)
+
+## 作业5：注册字符设备
+
+### Q&A:
+1. 作业5中的字符设备/dev/cicv是怎么创建的？它的设备号是多少？它是如何与我们写的字符设备驱动关联上的？
+	在build_image.sh中，往/etc/init.d/rcS输出了`mknod /dev/cicv c 248 0`。248是主设备号，0是次设备号。在rust_chrdev.rs中，我们在module!宏指定模块名为"cicv"，这样就与我们写的字符设备驱动关联上了。
+
+### 步骤
+1. make menuconfig，将rust samples中的字符设备驱动编译进内核。
+2. 修改rust_chrdev.rs，将module!宏中的模块名改为"cicv"，并实现file::Operations trait。
+3. make -j$(nproc)编译内核
+4. ./build_image.sh后进行测试
+
+![](./chrdev.png)
+
